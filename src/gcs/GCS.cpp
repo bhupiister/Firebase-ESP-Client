@@ -30,13 +30,21 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 #include "FirebaseFS.h"
-
 #ifdef ENABLE_GC_STORAGE
 
 #ifndef GOOGLE_CS_CPP
 #define GOOGLE_CS_CPP
 
 #include "GCS.h"
+
+#include "SdFat.h"
+// Try max SPI clock for an SD. Reduce SPI_CLOCK if errors occur.
+#define SPI_CLOCK SD_SCK_MHZ(10)
+#define SD_CONFIG2 SdSpiConfig(TFCARD_CS_PIN , SHARED_SPI, SPI_CLOCK)
+SdFs sdfs;
+FsFile direc;
+FsFile fileInt;
+//Edits by bhupi
 
 GG_CloudStorage::GG_CloudStorage()
 {
@@ -48,6 +56,8 @@ GG_CloudStorage::~GG_CloudStorage()
 void GG_CloudStorage::begin(UtilsClass *u)
 {
     ut = u;
+    //////////////////
+    Serial.println("When does this initialize?");
 }
 
 bool GG_CloudStorage::mUpload(FirebaseData *fbdo, const char *bucketID, const char *localFileName, fb_esp_mem_storage_type storageType, fb_esp_gcs_upload_type uploadType, const char *remoteFileName, const char *mime, UploadOptions *uploadOptions, RequestProperties *requestProps, UploadStatusInfo *status, ProgressCallback callback)
@@ -335,13 +345,27 @@ bool GG_CloudStorage::gcs_sendRequest(FirebaseData *fbdo, struct fb_esp_gcs_req_
                     return false;
                 }
 
-                if (!SD_FS.exists(req->localFileName.c_str()))
+                if (!SD_FS.exists(req->localFileName.c_str()))//Dummy function, dont change, its ineffective
                 {
                     fbdo->_ss.http_code = FIREBASE_ERROR_FILE_IO_ERROR;
                     return false;
                 }
+                //CheckFile();
+                if (!sdfs.begin(SD_CONFIG2))
+                {
+                    sdfs.initErrorHalt(&Serial);
+                    Serial.println("GCS: SD card Init failed");
+                    return false;
+                }
 
-                Signer.getCfg()->_int.fb_file = SD_FS.open(req->localFileName.c_str(), FILE_READ);
+                FsFile fileI = sdfs.open(req->localFileName.c_str(), O_RDONLY);
+                if (!fileI)
+                {
+                    Serial.println("Cannot get File");
+                    return false;
+                }
+
+                Signer.getCfg()->_int.fb_sfile = fileI;
 #else
                 return false;
 #endif
@@ -370,8 +394,7 @@ bool GG_CloudStorage::gcs_sendRequest(FirebaseData *fbdo, struct fb_esp_gcs_req_
 #endif
             }
 
-            req->fileSize = Signer.getCfg()->_int.fb_file.size();
-
+            req->fileSize = Signer.getCfg()->_int.fb_sfile.size();
             if (req->requestType == fb_esp_gcs_request_type_upload_resumable_init)
             {
                 if (req->fileSize < gcs_min_chunkSize)
@@ -700,7 +723,7 @@ bool GG_CloudStorage::gcs_sendRequest(FirebaseData *fbdo, struct fb_esp_gcs_req_
             {
                 if (available > bufLen)
                     available = bufLen;
-                read = Signer.getCfg()->_int.fb_file.read(buf, available);
+                read = Signer.getCfg()->_int.fb_sfile.read(buf, available);
                 byteRead += read;
                 reportUpploadProgress(fbdo, req, byteRead);
                 if (fbdo->tcpClient.stream()->write(buf, read) != read)
@@ -710,12 +733,12 @@ bool GG_CloudStorage::gcs_sendRequest(FirebaseData *fbdo, struct fb_esp_gcs_req_
                     break;
                 }
 
-                available = Signer.getCfg()->_int.fb_file.available();
+                available = Signer.getCfg()->_int.fb_sfile.available();
             }
             ut->delP(&buf);
             fbdo->_ss.long_running_task--;
 
-            Signer.getCfg()->_int.fb_file.close();
+            Signer.getCfg()->_int.fb_sfile.close();
 
             if (req->requestType == fb_esp_gcs_request_type_upload_multipart)
             {

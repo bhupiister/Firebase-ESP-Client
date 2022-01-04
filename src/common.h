@@ -46,13 +46,13 @@
 #endif
 
 #include <FS.h>
-
 #include "FirebaseFS.h"
-
+#include "SD_tasks.h"
 #if defined(FIREBASE_USE_PSRAM)
 #define FIREBASEJSON_USE_PSRAM
 #endif
 #include "json/FirebaseJson.h"
+
 
 #if defined(ENABLE_OTA_FIRMWARE_UPDATE) && (defined(ENABLE_RTDB) || defined(ENABLE_FB_STORAGE) || defined(ENABLE_GC_STORAGE))
 #if defined(ESP32)
@@ -732,6 +732,7 @@ struct fb_esp_cfg_int_t
     bool fb_processing = false;
     uint8_t fb_stream_idx = 0;
     fs::File fb_file;
+    FsFile fb_sfile;
     bool fb_sd_rdy = false;
     bool fb_flash_rdy = false;
     bool fb_sd_used = false;

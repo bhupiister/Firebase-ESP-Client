@@ -40,6 +40,13 @@
 #include "Utils.h"
 #include "session/FB_Session.h"
 
+#include "SD_tasks.h"
+
+// #ifndef SDMODULE
+// #define SDMODULE
+// SD_card sd_card =  SD_card();
+// #endif
+
 using namespace mb_string;
 
 class GG_CloudStorage
