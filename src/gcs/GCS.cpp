@@ -333,35 +333,26 @@ bool GG_CloudStorage::gcs_sendRequest(FirebaseData *fbdo, struct fb_esp_gcs_req_
             if (req->storageType == mem_storage_type_sd)
             {
 #if defined SD_FS
-                if (!ut->sdTest(Signer.getCfg()->_int.fb_file))
-                {
-                    fbdo->_ss.http_code = FIREBASE_ERROR_FILE_IO_ERROR;
-                    return false;
-                }
-
-                if (!Signer.getCfg()->_int.fb_sd_rdy)
-                {
-                    fbdo->_ss.http_code = FIREBASE_ERROR_FILE_IO_ERROR;
-                    return false;
-                }
-
-                if (!SD_FS.exists(req->localFileName.c_str()))//Dummy function, dont change, its ineffective
-                {
-                    fbdo->_ss.http_code = FIREBASE_ERROR_FILE_IO_ERROR;
-                    return false;
-                }
-                //CheckFile();
                 if (!sdfs.begin(SD_CONFIG2))
                 {
                     sdfs.initErrorHalt(&Serial);
-                    Serial.println("GCS: SD card Init failed");
+                    fbdo->_ss.http_code = FIREBASE_ERROR_FW_UPDATE_SDFATLIB_FAILED;
                     return false;
                 }
-
+                // if (!Signer.getCfg()->_int.fb_sd_rdy)
+                // {
+                //     fbdo->_ss.http_code = FIREBASE_ERROR_FILE_IO_ERROR;
+                //     return false;
+                // }
+                if (!sdfs.exists(req->localFileName.c_str()))
+                {
+                    fbdo->_ss.http_code = FIREBASE_ERROR_FW_UPDATE_SDFATLIB_FILE_NOT_FOUND;
+                    return false;
+                }
                 FsFile fileI = sdfs.open(req->localFileName.c_str(), O_RDONLY);
                 if (!fileI)
                 {
-                    Serial.println("Cannot get File");
+                    fbdo->_ss.http_code = FIREBASE_ERROR_FW_UPDATE_SDFATLIB_FILE_OPEN_FAILED;
                     return false;
                 }
 
